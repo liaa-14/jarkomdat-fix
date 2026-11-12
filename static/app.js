@@ -7,8 +7,8 @@ const SIGNAL_LEFT_MARGIN = 20;
 // Kecepatan sinyal terbentuk: tiap bit digambar dalam SIGNAL_BIT_MS milidetik.
 // Pesan yang sangat panjang dipercepat agar total animasi tidak lebih dari
 // SIGNAL_MAX_MS, sehingga antrean pesan berikutnya tidak menunggu terlalu lama.
-const SIGNAL_BIT_MS = 10000;
-const SIGNAL_MAX_MS = 20000;
+const SIGNAL_BIT_MS = 40;
+const SIGNAL_MAX_MS = 4000;
 
 let username = "";
 let closeActiveRoom = null;
@@ -154,6 +154,9 @@ function createSignalImage(frameBits, animate = false) {
       gridLines += `<line x1="${left}" y1="${gridTop}" x2="${left}" y2="${gridBottom}" class="grid"/>`;
     }
   });
+
+  // Garis putus-putus penutup di ujung akhir sinyal (batas kanan bit terakhir).
+  gridLines += `<line x1="${signalEnd}" y1="${gridTop}" x2="${signalEnd}" y2="${gridBottom}" class="grid"/>`;
 
   return `
     <svg class="signal-svg" xmlns="http://www.w3.org/2000/svg" width="${imageWidth}" height="${imageHeight}"
@@ -452,6 +455,8 @@ function startWebRTC(roomId) {
   const incomingQueue = [];
   let isPlayingQueue = false;
 
+  let outgoingChain = Promise.resolve();
+
   function enqueueIncoming(item) {
     incomingQueue.push(item); // masuk dari belakang
     if (!isPlayingQueue) playIncomingQueue();
@@ -545,6 +550,7 @@ function startWebRTC(roomId) {
     });
 
     messages.scrollTop = messages.scrollHeight;
+    message.scrollIntoView({ block: "end" });
 
     if (!animate) return Promise.resolve();
     return animateSignal(
@@ -753,7 +759,8 @@ function startWebRTC(roomId) {
       timestamp: Date.now(),
     };
 
-    // Kirim dulu agar lawan bicara langsung menerima, baru gambar sinyal sendiri.
+    input.value = "";
+
     dataChannel.send(JSON.stringify(message));
     socket.emit("save-chat", { frame });
     showChatMessage(dataBytes, username, true, message.timestamp, true);
