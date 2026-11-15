@@ -14,6 +14,35 @@ let username = "";
 let closeActiveRoom = null;
 let signalImageCount = 0;
 
+// Room ID tidak ditaruh di URL (URL cukup "#/room"). Room ID disimpan di
+// variabel ini dan di sessionStorage agar tetap ada saat halaman di-refresh.
+const ROOM_STORAGE_KEY = "activeRoomId";
+let activeRoomId = loadActiveRoomId();
+
+function loadActiveRoomId() {
+  try {
+    return sessionStorage.getItem(ROOM_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setActiveRoomId(roomId) {
+  activeRoomId = roomId || "";
+  try {
+    if (activeRoomId) sessionStorage.setItem(ROOM_STORAGE_KEY, activeRoomId);
+    else sessionStorage.removeItem(ROOM_STORAGE_KEY);
+  } catch {
+    // sessionStorage tidak tersedia: Room ID hanya disimpan di memori.
+  }
+}
+
+function openRoom(roomId) {
+  setActiveRoomId(roomId);
+  if (location.hash === "#/room") routePage();
+  else location.hash = "#/room";
+}
+
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -351,7 +380,7 @@ function showHomePage() {
       <p><code>${escapeHtml(newRoom)}</code></p>
       <button id="open-room" class="secondary">Masuk ke room</button>`;
     document.querySelector("#open-room").addEventListener("click", () => {
-      location.hash = `#/room/${newRoom}`;
+      openRoom(newRoom);
     });
   });
 
@@ -365,7 +394,7 @@ function showHomePage() {
       return;
     }
 
-    location.hash = `#/room/${roomId}`;
+    openRoom(roomId);
   });
 }
 
@@ -433,6 +462,7 @@ function showRoomPage(roomId) {
     // Putuskan session room sebelum berpindah ke halaman beranda.
     closeActiveRoom?.();
     closeActiveRoom = null;
+    setActiveRoomId("");
     location.hash = "#/home";
   });
 }
@@ -783,10 +813,24 @@ function routePage() {
     return;
   }
 
+  if (parts[0] === "room") {
+    // Link lama "#/room/KODE" tetap bisa dipakai, tapi kodenya langsung
+    // dihapus dari address bar (replaceState tidak memicu hashchange).
+    if (parts[1]) {
+      setActiveRoomId(normalizeRoomId(parts[1]));
+      history.replaceState(null, "", "#/room");
+    }
+    if (roomPattern.test(activeRoomId)) {
+      showRoomPage(activeRoomId);
+      return;
+    }
+  }
+
+  // Keluar dari halaman room (mis. tombol Back browser): lupakan Room ID.
+  setActiveRoomId("");
+
   if (parts[0] === "profile") {
     showProfilePage();
-  } else if (parts[0] === "room" && roomPattern.test(normalizeRoomId(parts[1]))) {
-    showRoomPage(normalizeRoomId(parts[1]));
   } else {
     showHomePage();
   }
